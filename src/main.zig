@@ -6,6 +6,7 @@ const linux = std.os.linux;
 const ascii = std.ascii;
 const mem = std.mem;
 const io = std.io;
+const fmt = std.fmt;
 
 const Buflen = 1000;
 const Numlen = 100;
@@ -103,13 +104,16 @@ pub fn main() !void {
                 print("{s}\n", .{buffer});
 
                 for (0..idx) |_| print("-", .{});
-                print("^ contains an alphabetic charactre\n", .{});
+                print("^ unknown charactre\n", .{});
 
                 continue :loop;
             }
         }
 
         var op: Operator = undefined;
+
+        // @NOTE | @Temporary:
+        // For I don't check for floating-point numbers.
         for (buffer[0..buflen]) |_| {
             var i: usize = 0;
             while(!is_operator(buffer[i])) {
@@ -130,6 +134,16 @@ pub fn main() !void {
             break; // @Temporary: Don't parse the rest of the expression 
         }
 
-        print("LHS: {s} and RHS: {s} and operator = {}\n", .{lhs, rhs, op});
+        _ = fmt.parseInt(i64, &lhs, 10) catch |err| {
+            print("Failed to prase LHS value into number: {s}\n", .{lhs});
+            print("[Message]: {!}\n", .{err});
+            continue;
+        };
+
+        _ = fmt.parseInt(i64, &rhs, 10) catch |err| {
+            print("Failed to prase RHS value into number: {s}\n", .{rhs});
+            print("[Message]: {!}\n", .{err});
+            continue;
+        };
     }
 }
