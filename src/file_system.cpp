@@ -8,24 +8,6 @@
 
 bool remove_file(const char *path);
 
-// Open a file in the '/tmp' directory and delete the file when no longer in use
-struct TFile {
-   FILE *fd;
-   const char *path;
-
-   ~TFile();
-};
-
-TFile::~TFile() {
-   int err = fclose(fd);
-   if (err != 0) {
-      report_error("failed to close tmp-file: %", path);
-      return;
-   }
-
-   remove_file(path);
-}
-
 struct File {
    FILE *fd;
    const char *path;
@@ -104,17 +86,6 @@ File open_file(const char *file_path, const char *modes) {
    return File {
       .fd = file,
       .path = file_path
-   };
-}
-
-TFile open_tmpfile(const char *filepath, const char *modes) {
-   FILE *file = fopen(filepath, modes);
-
-   if (file == NULL) fatal_error("failed to open file: %", filepath);
-
-   return TFile {
-      .fd = file,
-      .path = filepath
    };
 }
 
