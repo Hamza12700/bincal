@@ -121,13 +121,17 @@ int main() {
       write(STDERR_FILENO, "> ", 2);
       read(STDIN_FILENO, buffer.buf, buffer.capacity-1);
 
+      if (buffer[0] == '\n') continue; // Skip the empty expression
+
       uint buflen = buffer.len();
+
+      // Remove the newline character from the end of the expression
       if (buffer[buflen-1] == '\n') {
          buffer.remove(buflen-1);
          buflen -= 1;
       }
 
-      if (buflen <= 1) {
+      if (buflen <= 2) {
          printf("Expression is too short or invalid!\n");
          continue;
       }
@@ -159,6 +163,8 @@ int main() {
 
       for (uint i = 0; i < buflen; i++) {
          char c = buffer[i];
+
+         if (isspace(c)) continue; // Skip whitespace
 
          if (isalpha(c)) {
             printf("\nExpression can not contain a alphabetical character\n");
@@ -197,6 +203,11 @@ int main() {
       // For I don't check for floating-point numbers.
       for (uint i = 0; i < buflen; i++) {
          while (!is_operator(buffer[i])) {
+            if (isspace(buffer[i])) { // Skip whitespace
+               i += 1;
+               continue;
+            }
+
             lhs[i] = buffer[i];
             i += 1;
          }
@@ -206,6 +217,11 @@ int main() {
 
          uint x = 0;
          while (x < buflen) {
+            if (isspace(buffer[i])) { // Skip whitespace
+               i += 1;
+               continue;
+            }
+
             rhs[x] = buffer[i];
 
             x += 1;
