@@ -84,7 +84,7 @@ FILE* generate_asm(const int num1, const int num2, const Operator op) {
 
 void compile_asm(Fixed_Allocator *allocator) {
    fprintf(stderr, "Compiling... ");
-   auto cmd = format_string(allocator, "./build/fasm %", Asmfile);
+   auto cmd = format_string(allocator, "./bin/fasm %", Asmfile);
    system(cmd.buf);
 };
 
