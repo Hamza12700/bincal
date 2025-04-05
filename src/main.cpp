@@ -109,6 +109,7 @@ bool execute_asm() {
 
 int main() {
    auto allocator = fixed_allocator(getpagesize() * 2);
+   bool show_asm = false; // Option to display the generated assembly
 
    while (true) {
       allocator.reset();
@@ -131,6 +132,8 @@ int main() {
          continue;
       }
 
+      // @Temporary: Hardcoding the commands name and their functionality for now
+
       if (buffer.cmp("quit") || buffer.cmp("exit")) {
          printf("Goodbye\n");
          break;
@@ -138,6 +141,16 @@ int main() {
 
       if (buffer.cmp("clear")) {
          printf("\x1b[2J\x1b[H\n");
+         continue;
+      }
+
+      if (buffer.cmp("show asm")) {
+         show_asm = true;
+         continue;
+      }
+
+      if (buffer.cmp("hide asm")) {
+         show_asm = false;
          continue;
       }
 
@@ -221,9 +234,11 @@ int main() {
       FILE *asmfile = generate_asm(lhs_num, rhs_num, op);
       auto contents = fread_into_string(&allocator, asmfile);
 
-      printf("\nGenerated Assembly:\n\n");
-      printf("%s", contents.buf);
-      printf("\n--- END ---\n\n");
+      if (show_asm) {
+         printf("\nGenerated Assembly:\n\n");
+         printf("%s", contents.buf);
+         printf("\n--- END ---\n\n");
+      }
 
       compile_asm(&allocator);
       execute_asm();
