@@ -1,10 +1,15 @@
-#include "strings.cpp"
+#include <sys/wait.h>
+
+#include "file_system.cpp"
+
+#define Asmfile "asmfile.asm"
+#define Asmbin "./asmfile"
 
 enum Operator : u8 {
    Plus,
    Minus,
    Multiply,
-   Devide,
+   Divide,
    Unknown
 };
 
@@ -13,7 +18,7 @@ Operator get_operator(char op) {
       case '+': return Plus;
       case '-': return Minus;
       case '*': return Multiply;
-      case '/': return Devide;
+      case '/': return Divide;
 
       default: return Unknown;
    };
@@ -24,17 +29,93 @@ bool is_operator (char op) {
    return true;
 }
 
-int main() {
-   auto allocator = fixed_allocator(1 << 12);
+FILE* generate_asm(const int num1, const int num2, const Operator op) {
+   auto asmfile = fopen(Asmfile, "w+");
+   assert_err(!asmfile, "tmpfile failed");
 
-   auto buffer = string_with_size(&allocator, 1000);
-   auto lhs = string_with_size(&allocator, 1000);
-   auto rhs = string_with_size(&allocator, 1000);
+   fprintf(asmfile, "format ELF64 executable\n"); // Writing the header
+   fprintf(asmfile, "_start:\n"); // The start section of the executable
+
+   switch (op) {
+      case Plus: {
+         fprintf(asmfile, "\tmov rax, %d\n", num1);
+         fprintf(asmfile, "\tadd rax, %d\n", num2);
+         break;
+      }
+
+      case Minus: {
+         fprintf(asmfile, "\tmov rax, %d\n", num1);
+         fprintf(asmfile, "\tsub rax, %d\n", num2);
+         break;
+      }
+
+      // @Temporary: Only for signed integers
+      case Multiply: {
+         fprintf(asmfile, "\tmov rax, %d\n", num1);
+         fprintf(asmfile, "\tmov rbx, %d\n", num2);
+         fprintf(asmfile, "\timul rax, rbx\n");
+         break;
+      }
+
+      // @Temporary: Only for signed integers
+      case Divide: {
+         fprintf(asmfile, "\tmov rax, %d\n", num1);
+         fprintf(asmfile, "\tmov rbx, %d\n", num2);
+         fprintf(asmfile, "\tcqo\n"); // sign-extend rax into rdx (prepares rdx:rax for division)
+         fprintf(asmfile, "\tidiv rbx\n"); // rax = rax / rbx
+         break;
+      }
+
+      case Unknown: {
+         assert(true, "Shouldn't get to unknown operator when generating asm");
+         break;
+      }
+   }
+
+   fprintf(asmfile, "\n");
+
+   // Use the number stored in the 'eax' as an exit code!
+   fprintf(asmfile, "\tmov rdi, rax\n");  // status code
+   fprintf(asmfile, "\tmov rax, 60\n");   // exit syscall
+   fprintf(asmfile, "\tsyscall\n");
+
+   return asmfile;
+}
+
+void compile_asm(Fixed_Allocator *allocator) {
+   fprintf(stderr, "Compiling... ");
+   auto cmd = format_string(allocator, "./build/fasm %", Asmfile);
+   system(cmd.buf);
+};
+
+// Returns true on success otherwise false
+bool execute_asm() {
+   int pid = fork();
+   if (pid == -1) {
+      fprintf(stderr, "failed to fork the process");
+      return false;
+   }
+
+   if (pid == 0) execl(Asmbin, Asmbin, NULL);
+
+   int status;
+   waitpid(pid, &status, 0);
+
+   int exit_code = WEXITSTATUS(status);
+   printf("Result: %d\n", exit_code);
+
+   return true;
+}
+
+int main() {
+   auto allocator = fixed_allocator(getpagesize() * 2);
 
    while (true) {
-      memset(buffer.buf, 0, buffer.len()+1);
-      memset(lhs.buf, 0, lhs.len()+1);
-      memset(rhs.buf, 0, lhs.len()+1);
+      allocator.reset();
+
+      auto buffer = string_with_size(&allocator, 1000);
+      auto lhs = string_with_size(&allocator, 1000);
+      auto rhs = string_with_size(&allocator, 1000);
 
       write(STDERR_FILENO, "> ", 2);
       read(STDIN_FILENO, buffer.buf, buffer.capacity-1);
@@ -98,6 +179,9 @@ int main() {
       if (!is_valid) continue;
 
       auto op = Unknown;
+
+      // @NOTE | @Temporary:
+      // For I don't check for floating-point numbers.
       for (uint i = 0; i < buflen; i++) {
          while (!is_operator(buffer[i])) {
             lhs[i] = buffer[i];
@@ -118,6 +202,10 @@ int main() {
          break; // @Temporary: Don't parse the rest of the expression
       }
 
+      // Sucks, that 'atol, atoi, ...' doesn't give a good error message.
+      // I may have to implement a function for parsing integers, floats and etc myself.
+      // But this is not important yet, maybe for more complex expressions like having operator precedence.
+
       int lhs_num = atoi(lhs.buf);
       if (lhs_num == 0) {
          printf("\n'atoi' returned 0 with this LHS value '%s'\n", lhs.buf);
@@ -129,6 +217,21 @@ int main() {
          printf("\n'atoi' returned 0 with this RHS value '%s'\n", rhs.buf);
          continue;
       }
+
+      FILE *asmfile = generate_asm(lhs_num, rhs_num, op);
+      auto contents = fread_into_string(&allocator, asmfile);
+
+      printf("\nGenerated Assembly:\n\n");
+      printf("%s", contents.buf);
+      printf("\n--- END ---\n\n");
+
+      compile_asm(&allocator);
+      execute_asm();
+
+      // Remove generated files
+      fclose(asmfile);
+      unlink(Asmfile);
+      unlink(Asmbin);
    }
 
    allocator.free();

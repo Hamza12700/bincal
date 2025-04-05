@@ -15,7 +15,7 @@ const Operator = enum(u8) {
     Plus,
     Minus,
     Multiply,
-    Devide,
+    Divide,
     Unknown
 };
 
