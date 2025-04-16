@@ -2,19 +2,7 @@
 #include "strings.cpp"
 #include "term_colors.cpp"
 
-struct BTree; // Binary-Tree for math operators
-
-struct Token;
-
-struct BTree {
-   size_t value;
-
-   BTree *left = NULL;
-   BTree *right = NULL;
-
-   char op;
-};
-
+/*
 enum Token_Type {
    Number,
    Alphabet,
@@ -34,13 +22,118 @@ enum Token_Type {
 
    Unknown,      // Any character/symbol that isn't listed in this enum gets this
 };
+*/
+
+enum Btree_Flags {
+   LEFT_LITERAL = 1,
+   LEFT_BTREE = 2,
+
+   RIGHT_LITERAL = 4,
+   RIGHT_BTREE = 8,
+
+   BTREE = 16,
+   LITERAL = 32,
+};
+
+struct Btree { // Binary-Tree for Binary expressions (duh)
+
+   union {
+      struct {
+         int lvalue;
+         int rvalue;
+      };
+
+      struct {
+         void *left_tree;
+         void *right_tree;
+      };
+   };
+
+   int flags = 0; // Type information about the left and right nodes
+   char root;
+
+   void push_left(void *tree_or_literal, int type);
+};
+
+// void Btree::push_left(void *tree_or_literal, int type) {
+//    if (type & LITERAL) {
+//       auto btree = static_cast <Btree *>(tree_or_literal);
+//
+//       root = btree->root;
+//       flags = btree->flags;
+//       left_tree = btree;
+//       return;
+//    }
+//
+//    auto literal = *static_cast <long *>(tree_or_literal);
+// }
+
+bool is_operator(char op) {
+   switch (op) {
+      case '+':
+      case '-':
+      case '=':
+      case '*':
+      case '/': return true;
+
+      default: return false;
+   }
+}
 
 struct Token {
-   uint idx = 0; // Index to the token where it is, so we can point to it without caring about whitespace.
+   uint idx = 0; // Index to the token where it is in the string
 
-   char value;
-   Token_Type type = Unknown;
+   union { // @Temporary: I don't like this, I would like to do something more clean.
+      int num;
+      char literal;
+   };
+
+   bool is_num = false;
 };
+
+// Helper function to check for errors when using an operator
+static bool validate_operator(Array<Token> &tokens, const int token_idx, const char *source) {
+   if (!is_operator(tokens[token_idx].literal)) {
+      printf("Not an operator\n");
+      printf("Token-index: %u, source: %s\n", token_idx, source);
+      return false;
+   }
+
+   if (token_idx-1 < 0) {
+      printf("\nLeft side of the expression has no value\n");
+      return false;
+   }
+
+   if (!isdigit(tokens[token_idx-1].literal)) {
+      printf("\n[Error]: can't operator on non-numerical value\n");
+
+      printf("%s\n", source);
+      for (int x = 1; x < token_idx; x++) write(STDOUT_FILENO, "-", 1);
+      printf("^ isn't a number\n");
+      return false;
+   }
+
+   if (token_idx+1 >= tokens.capacity) {
+      printf("\n[Error]: Expected a number after the operator\n");
+
+      printf("%s\n", source);
+      for (int x = 0; x < token_idx; x++) write(STDOUT_FILENO, "-", 1);
+      printf(" ^ expected a number here\n");
+      return false;
+   }
+
+   auto next = tokens[token_idx+1];
+   if (!isdigit(next.literal)) {
+      printf("\nInvalid Expression:\n");
+
+      printf("%s\n", source);
+      for (int x = 0; x <= token_idx; x++) write(STDOUT_FILENO, "-", 1);
+      printf("^ expected a number here\n");
+      return false;
+   }
+
+   return true;
+}
 
 bool lexer(const String *string, Fixed_Allocator *allocator) {
 
@@ -48,121 +141,125 @@ bool lexer(const String *string, Fixed_Allocator *allocator) {
    
    for (uint i = 0; i < string->len(); i++) {
       const char c = (*string)[i];
-      Token token;
+      Token token = {0};
 
       if (c == ' ') continue; // Skip the whitespace. We don't need it because we keep the track of the character index
 
       if (isdigit(c)) {
-         token.type = Number;
-         token.idx = i;
-         token.value = c;
+         token.idx = i; // Starting index
+         auto dstring = *string;
+
+         uint count = 0;
+         for (uint x = i; x < string->len(); x++) {
+            if (isdigit(dstring[x])) count += 1;
+            else break;
+         }
+
+         auto buffer = string_with_size(allocator, count);
+         while (isdigit(dstring[i])) {
+            buffer.concat(dstring[i]);
+            i += 1;
+         }
+
+         i -= 1; // Get back to previous character
+
+         token.num = atoi(buffer.buf);
+         token.is_num = true;
 
          tokens.push(token);
          continue;
       }
 
       if (isalpha(c)) {
-         token.type = Alphabet;
+         token.literal = c;
          token.idx = i;
-         token.value = c;
 
          tokens.push(token);
          continue;
       }
 
       if (c == '%') {
-         token.type = Percent;
+         token.literal = c;
          token.idx = i;
-         token.value = c;
 
          tokens.push(token);
          continue;
       }
 
       if (c == '/') {
-         token.type = Forward_Slash;
+         token.literal = c;
          token.idx = i;
-         token.value = c;
 
          tokens.push(token);
          continue;
       }
 
       if (c == '=') {
-         token.type = Equal;
+         token.literal = c;
          token.idx = i;
-         token.value = c;
 
          tokens.push(token);
          continue;
       }
 
       if (c == '+') {
-         token.type = Plus;
+         token.literal = c;
          token.idx = i;
-         token.value = c;
 
          tokens.push(token);
          continue;
       }
 
       if (c == '-') {
-         token.type = Minus;
+         token.literal = c;
          token.idx = i;
-         token.value = c;
 
          tokens.push(token);
          continue;
       }
 
       if (c == '*') {
-         token.type = Asterisk;
+         token.literal = c;
          token.idx = i;
-         token.value = c;
 
          tokens.push(token);
          continue;
       }
 
       if (c == '>') {
-         token.type = Greater_Than;
+         token.literal = c;
          token.idx = i;
-         token.value = c;
 
          tokens.push(token);
          continue;
       }
 
       if (c == '<') {
-         token.type = Less_Than;
+         token.literal = c;
          token.idx = i;
-         token.value = c;
 
          tokens.push(token);
          continue;
       }
 
       if (c == '(') {
-         token.type = Open_Paren;
+         token.literal = c;
          token.idx = i;
-         token.value = c;
 
          tokens.push(token);
          continue;
       }
 
       if (c == ')') {
-         token.type = Close_Paren;
+         token.literal = c;
          token.idx = i;
-         token.value = c;
 
          tokens.push(token);
          continue;
       }
 
-      // Everything else gets the 'Unknown' Token type
-      token.type = Unknown;
-      token.value = c;
+      // Everything else gets '0'
+      token.literal = 0;
       token.idx = i;
 
       tokens.push(token);
@@ -172,7 +269,7 @@ bool lexer(const String *string, Fixed_Allocator *allocator) {
    for (uint i = 0; i < tokens.index; i++) {
       auto token = tokens[i]; 
 
-      if (token.type == Alphabet) {
+      if (isalpha(token.literal)) { // @Temporary: Error case for now
          fprintf(stderr, "\n[Error]: Expression can not contain any alphabet characters\n");
          fprintf(stderr, "%s\n", string->buf);
 
@@ -181,7 +278,7 @@ bool lexer(const String *string, Fixed_Allocator *allocator) {
 
          for (uint x = token.idx; x < string->len(); x++) {
             auto next = (*string)[x];
-            if (isascii(next)) {
+            if (isalpha(next)) {
                fprintf(stderr, "%s", red(^));
                continue;
             }
@@ -193,8 +290,94 @@ bool lexer(const String *string, Fixed_Allocator *allocator) {
          return false;
       }
 
-      if (token.type == Plus) {
+      if (token.is_num) {
+         Btree tree;
+
+         tree.lvalue = token.num;
+
+         i += 1;
+         if (i > tokens.index) {
+            fprintf(stderr, "Expected an operator\n");
+            return false;
+         }
+
+         auto next = tokens[i];
+         tree.root = next.literal;
+
+         i += 1;
+         if (i > tokens.index) {
+            fprintf(stderr, "Expected a number\n");
+            return false;
+         }
+
+         tree.rvalue = tokens[i].num;
       }
+
+      /*
+      if (token.type == '+') {
+         if (!validate_operator(tokens, i, string->buf))
+            return false;
+
+         auto left = tokens[i-1];
+         auto right = tokens[i+1];
+         Btree btree;
+
+         btree.left = &left;
+         btree.right = &right;
+         btree.root = token.type;
+
+         btree.flags |= LEFT_LITERAL | RIGHT_LITERAL;
+         continue;
+      }
+
+      if (token.type == '-') {
+         if (!validate_operator(tokens, i, string->buf))
+            return false;
+
+         auto left = tokens[i-1];
+         auto right = tokens[i+1];
+         Btree btree;
+
+         btree.left = &left;
+         btree.right = &right;
+         btree.root = token.type;
+
+         btree.flags |= LEFT_LITERAL | RIGHT_LITERAL;
+         continue;
+      }
+
+      if (token.type == '*') {
+         if (!validate_operator(tokens, i, string->buf))
+            return false;
+
+         auto left = tokens[i-1];
+         auto right = tokens[i+1];
+         Btree btree;
+
+         btree.left = &left;
+         btree.right = &right;
+         btree.root = token.type;
+
+         btree.flags |= LEFT_LITERAL | RIGHT_LITERAL;
+         continue;
+      }
+
+      if (token.type == '/') {
+         if (!validate_operator(tokens, i, string->buf))
+            return false;
+
+         auto left = tokens[i-1];
+         auto right = tokens[i+1];
+         Btree btree;
+
+         btree.left = &left;
+         btree.right = &right;
+         btree.root = token.type;
+
+         btree.flags |= LEFT_LITERAL | RIGHT_LITERAL;
+         continue;
+      }
+   */
    }
 
    return true;
