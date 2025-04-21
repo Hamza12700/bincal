@@ -1,105 +1,90 @@
 #include "lexer.cpp"
 
-// @Temporary:
-//
-// This should return some kind-of expression Type which will then be used to generate the x86_64-bit assembly.
-// But for now we are returning a boolean value to check for failures.
+struct Btree {
+   Btree *left = NULL;
+   Btree *right = NULL;
 
-static bool parse_token(Array<Token> &tokens, const uint token_idx, const char *source) {
-   const auto token = tokens[token_idx];
+   int val = 0;
+   char op;
+};
 
-   switch (token) {
-      case Number: return true;
+void print_tree(Btree *node) {
+   if (node == NULL) return;
 
-      case Plus: {
-         if (!operator_validation(tokens, token_idx, source))
-            return false;
+   if (node->val == 0)
+      printf("operator: %c\n", node->op);
+   else
+      printf("num: %d\n", node->val);
 
-         return true;
-      }
-
-      case Minus: {
-         if (!operator_validation(tokens, token_idx, source))
-            return false;
-
-         return true;
-      }
-
-      case Asterisk: {
-         if (!operator_validation(tokens, token_idx, source))
-            return false;
-
-         return true;
-      }
-
-      case Forward_Slash: {
-         if (!operator_validation(tokens, token_idx, source))
-            return false;
-
-         return true;
-      }
-
-      case Percent: {
-         if (!operator_validation(tokens, token_idx, source))
-            return false;
-
-         return true;
-      }
-
-      case Equal: { // Compare two numerical values
-         if (!operator_validation(tokens, token_idx, source))
-            return false;
-
-         return true;
-      }
-
-      case Greater_Than: {
-         if (!operator_validation(tokens, token_idx, source))
-            return false;
-
-         return true;
-      }
-
-      case Less_Than: {
-         if (!operator_validation(tokens, token_idx, source))
-            return false;
-
-         return true;
-      }
-
-      case Alphabet: {
-         printf("\nUsing variables to store the result of an expression is not currently supported\n");
-         return false;
-      }
-
-      case Open_Paren: {}
-      case Close_Paren: {}
-
-      case Unknown: {
-         printf("\n[Error]: Unknown character encounted\n");
-
-         printf("%s\n", source);
-         for (uint x = 0; x < token_idx; x++) write(STDOUT_FILENO, "-", 1);
-         write(STDOUT_FILENO, "^", 1); 
-
-         return false;
-      }
-   }
+   print_tree(node->left);
+   print_tree(node->right);
 }
 
-static bool parse_input(const String *input, Fixed_Allocator *allocator) {
-   auto tokens = token_stream(input, allocator);
+bool parse_expression(Lexer lexer) {
+   auto allocator = fixed_allocator(getpagesize()*2);
 
-   // @Temporary: For now, every expression starts with a number
-   if (tokens[0] != Number) {
-      printf("\nExpression doesn't start with a number!\n");
-      return false;
+   Btree *last = NULL;
+   auto tokens = lexer.tokens;
+
+   for (auto token = lexer.next_token(); token != NULL; token = lexer.next_token()) {
+      if (isalpha(token->literal)) { // @Temporary: Error case for now
+         fprintf(stderr, "\n[Error]: Expression can not contain any alphabet characters\n");
+         return false;
+      }
+
+      if (!token->is_num && !is_operator(token->literal)) {
+         fprintf(stderr, "Expression doesn't contain any numerical value\n");
+         return false;
+      }
+
+      if (is_operator(token->literal)) {
+         auto root = static_cast <Btree *> (allocator.alloc(sizeof(Btree)));
+         auto right = static_cast <Btree *> (allocator.alloc(sizeof(Btree)));
+
+         root->op = token->literal;
+         auto next = lexer.next_token();
+         if (!next->is_num) {
+            fprintf(stderr, "\nExpected a number after the operator\n");
+            return false;
+         }
+
+         right->val = next->num;
+         root->right = right;
+         root->left = last;
+         last = root;
+      }
+
+      if (token->is_num) {
+         auto root = static_cast <Btree *> (allocator.alloc(sizeof(Btree)));
+         auto left = static_cast <Btree *> (allocator.alloc(sizeof(Btree)));
+         auto right = static_cast <Btree *> (allocator.alloc(sizeof(Btree)));
+
+         left->val = token->num;
+
+         auto *next = lexer.next_token();
+         if (!next) return false;
+
+         if (!is_operator(next->literal)) {
+            fprintf(stderr, "\nExpected an operator after the number\n");
+            return false;
+         }
+
+         root->op = next->literal;
+
+         next = lexer.next_token();
+         if (!next->is_num) {
+            fprintf(stderr, "\nExpected a number after the operator\n");
+            return false;
+         }
+
+         right->val = next->num;
+
+         root->left = left;
+         root->right = right;
+         last = root;
+      }
    }
 
-   for (uint i = 0; i < tokens.index; i++) {
-      if (parse_token(tokens, i, input->buf)) continue;
-      return false;
-   }
-
+   print_tree(last);
    return true;
-}
+};

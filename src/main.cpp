@@ -1,4 +1,4 @@
-#include "lexer.cpp"
+#include "parser.cpp"
 
 int main() {
    auto allocator = fixed_allocator(getpagesize() * 2);
@@ -43,7 +43,8 @@ int main() {
          continue;
       }
 
-      if (!lexer(&buffer, &allocator)) continue;
+      auto lexer = lex(&buffer, &allocator);
+      if (!parse_expression(lexer)) continue;
    }
 
    allocator.free();

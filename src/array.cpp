@@ -11,36 +11,28 @@
 template<typename T>
 struct Array {
    T *ptr = NULL;
-   uint index = 0; // Points at the last element of the array
+   uint size = 0; // Points at the last element of the array
    uint capacity = 0;
 
    bool with_allocator = false;
 
-   Array(Fixed_Allocator *allocator, const uint num) {
-      void *mem = allocator->alloc(num * sizeof(T));
-
-      ptr = static_cast<T *> (mem);
-      with_allocator = true;
-      capacity = num;
-   }
-
    ~Array() {
       if (!with_allocator) {
          free(ptr);
-         index = 0;
+         size = 0;
          capacity = 0;
       }
    }
 
    void push(T value) {
-      if (index+1 > capacity) {
+      if (size+1 > capacity) {
          fprintf(stderr, "array - out of space\n");
          fprintf(stderr, "capacity is '%u'\n", capacity);
          STOP;
       }
 
-      ptr[index*sizeof(T)] = value;
-      index += 1;
+      ptr[size*sizeof(T)] = value;
+      size += 1;
    }
 
    T& operator[] (const uint idx) {
@@ -53,5 +45,16 @@ struct Array {
       return ptr[idx*sizeof(T)];
    }
 };
+
+template <typename T>
+Array<T> make_array(Fixed_Allocator *allocator, uint num) {
+   void *mem = allocator->alloc(num * sizeof(T));
+
+   return Array<T> {
+      .ptr = static_cast<T *> (mem),
+      .capacity = num,
+      .with_allocator = true,
+   };
+}
 
 #endif
