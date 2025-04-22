@@ -26,7 +26,7 @@ bool parse_expression(Lexer lexer) {
    Btree *last = NULL;
    auto tokens = lexer.tokens;
 
-   for (auto token = lexer.next_token(); token != NULL; token = lexer.next_token()) {
+   for (auto token = lexer.next_token(); token; token = lexer.next_token()) {
       if (isalpha(token->literal)) { // @Temporary: Error case for now
          fprintf(stderr, "\n[Error]: Expression can not contain any alphabet characters\n");
          return false;
@@ -85,6 +85,5 @@ bool parse_expression(Lexer lexer) {
       }
    }
 
-   print_tree(last);
    return true;
 };

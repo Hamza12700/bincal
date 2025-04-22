@@ -34,65 +34,63 @@ struct Lexer {
 };
 
 Token *Lexer::get_token(uint idx) {
-   if (idx >= tokens.capacity) return NULL;
+   if (idx >= tokens.size) return NULL;
    return &tokens[idx];
 }
 
 Token *Lexer::next_token() {
-   if (index+1 >= tokens.capacity) return NULL;
+   if (index+1 >= tokens.size) return NULL;
    index += 1;
    return &tokens[index];
 }
 
 Token *Lexer::peek_next() {
-   if (index+1 >= tokens.capacity) return NULL;
+   if (index+1 >= tokens.size) return NULL;
    return &tokens[index+1];
 }
 
-Lexer lex(String *string, Fixed_Allocator *allocator) {
+Lexer lex(String &string, Fixed_Allocator *allocator) {
    Lexer lexer;
-   lexer.tokens = make_array<Token> (allocator, string->len()); // Token stream can't be larger than the original input string in length
+   lexer.tokens = make_array<Token> (allocator, string.len()); // Token stream can't be larger than the original input string in length
    
-   for (uint i = 0; i < string->len(); i++) {
-      const char c = (*string)[i];
+   for (uint i = 0; i < string.len(); i++) {
+      char c = string[i];
       Token token;
 
-      if (c == ' ') continue; // Skip the whitespace. We don't need it because we keep the track of the character index
-
       if (isdigit(c)) {
-         token.idx = i; // Starting index
-         auto dstring = *string;
+         token.idx = i; // Starting index of the number
 
          uint count = 0;
-         for (uint x = i; x < string->len(); x++) {
-            if (isdigit(dstring[x])) count += 1;
+         for (uint x = i; x < string.len(); x++) {
+            if (isdigit(string[x])) count += 1;
             else break;
          }
 
          auto buffer = string_with_size(allocator, count);
-         while (isdigit(dstring[i])) {
-            buffer.concat(dstring[i]);
+         while (isdigit(string[i])) {
+            buffer.concat(string[i]);
             i += 1;
          }
-
-         i -= 1; // Get back to previous character
 
          token.num = atoi(buffer.buf);
          token.is_num = true;
 
          lexer.tokens.push(token);
+
+         // @NOTE | @Temporary:
+         //
+         // We have to go back one character because we want to continue the loop, even tho we know that the next character isn't a number,
+         // we still have to do it because of the check in the loop 'i < string.len()'
+         //
+         // - Hamza 22 April 2025
+
+         i -= 1;
          continue;
       }
+
+      if (c == ' ') continue; // Skip the whitespace. We don't need it because we keep the track of the character index
 
       if (isalpha(c)) {
-         token.literal = c;
-         token.idx = i;
-
-         lexer.tokens.push(token);
-         continue;
-      }
-
-      if (c == '%') {
          token.literal = c;
          token.idx = i;
 
@@ -172,8 +170,7 @@ Lexer lex(String *string, Fixed_Allocator *allocator) {
          continue;
       }
 
-      // Everything else gets '0'
-      token.literal = 0;
+      token.literal = -1;
       token.idx = i;
 
       lexer.tokens.push(token);

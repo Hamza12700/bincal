@@ -43,7 +43,7 @@ int main() {
          continue;
       }
 
-      auto lexer = lex(&buffer, &allocator);
+      auto lexer = lex(buffer, &allocator);
       if (!parse_expression(lexer)) continue;
    }
 
