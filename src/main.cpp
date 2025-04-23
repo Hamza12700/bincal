@@ -1,4 +1,4 @@
-#include "asm.cpp"
+#include "parser.cpp"
 
 int main() {
    auto allocator = fixed_allocator(getpagesize() * 2);
@@ -33,10 +33,6 @@ int main() {
       Btree *tree = parse_expression(lexer);
 
       if (!tree) continue;
-
-      printf("\n--- START ---\n");
-      gen_asm(tree);
-      printf("--- END ---\n\n");
    }
 
    allocator.free();
