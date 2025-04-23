@@ -1,10 +1,6 @@
 #include "parser.cpp"
 
 struct Asm_Writer {
-   FILE *file;
-   Asm_Writer(char *filename);
-   ~Asm_Writer();
-
    template<typename ...Args>
    void write(char *buf, Args ...args);
    void write(String &buf);
@@ -16,57 +12,40 @@ struct Asm_Writer {
    void rax_sub(int num);
 };
 
-Asm_Writer::Asm_Writer(char *filename) {
-   file = fopen(filename, "w");
-   assert_err(!file, "failed to open file");
-
-   fprintf(file, "format ELF64 executable\n");
-   fprintf(file, "entry start\n\n");
-
-   fprintf(file, "start:\n");
-}
-
-Asm_Writer::~Asm_Writer() {
-   fprintf(file, "\n");
-   fprintf(file, "   mov eax, 60\n");
-   fprintf(file, "   mov ebx, 0\n");
-   fprintf(file, "   syscall\n");
-}
-
 void Asm_Writer::write(String &buf) {
-   fprintf(file, "   %s\n", buf.buf);
+   printf("%s\n", buf.buf);
 }
 
 template<typename ...Args>
 void Asm_Writer::write(char *buf, Args ...args) {
    auto buffer = format_string(buf, args...);
-   fprnitf(file, "   %s\n", buffer.buf); 
+   printf("%s\n", buffer.buf); 
 }
 
 void Asm_Writer::rax_mov_add(int num1, int num2) {
-   fprintf(file, "   mov rax, %d\n", num1);
-   fprintf(file, "   add rax, %d\n", num2);
+   printf("mov rax, %d\n", num1);
+   printf("add rax, %d\n\n", num2);
 }
 
 void Asm_Writer::rax_add(int num) {
-   fprintf(file, "   add rax, %d\n", num);
+   printf("add rax, %d\n", num);
 }
 
 void Asm_Writer::rax_sub(int num) {
-   fprintf(file, "   sub rax, %d\n", num);
+   printf("sub rax, %d\n", num);
 }
 
 void Asm_Writer::rax_mov_sub(int num1, int num2) {
-   fprintf(file, "   mov rax, %d\n", num1);
-   fprintf(file, "   sub rax, %d\n", num2);
+   printf("mov rax, %d\n", num1);
+   printf("sub rax, %d\n\n", num2);
 }
 
-auto asm_writer = Asm_Writer("asm");
+Asm_Writer asm_writer;
 
-FILE *gen_asm(Btree *tree) {
-   if (tree == NULL) return NULL; 
+void gen_asm(Btree *tree) {
+   if (tree == NULL) return; 
    if (tree->left) gen_asm(tree->left);
-   if (!tree->parent) return NULL;
+   if (!tree->parent) return;
 
    auto parent = tree->parent;
 
@@ -86,5 +65,5 @@ FILE *gen_asm(Btree *tree) {
          asm_writer.rax_sub(right->val);
    }
 
-   return asm_writer.file;
+   return;
 }

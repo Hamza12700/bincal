@@ -2,17 +2,15 @@
 
 int main() {
    auto allocator = fixed_allocator(getpagesize() * 2);
-   bool show_asm = false; // Option to display the generated assembly
 
    while (true) {
       allocator.reset();
       auto buffer = string_with_size(&allocator, 1000);
 
-      write(STDERR_FILENO, "> ", 2);
+      write(STDIN_FILENO, "> ", 2);
       read(STDIN_FILENO, buffer.buf, buffer.capacity-1);
 
-      if (buffer[0] == '\n') continue; // Skip the empty expression
-
+      if (buffer[0] == '\n') continue; // Skip if newline
       uint buflen = buffer.len();
 
       // Remove the newline character from the end of the expression
@@ -20,8 +18,6 @@ int main() {
          buffer.remove(buflen-1);
          buflen -= 1;
       }
-
-      // @Temporary: Hardcoding the commands name and their functionality for now
 
       if (buffer.cmp("quit")) {
          printf("Goodbye\n");
@@ -33,22 +29,14 @@ int main() {
          continue;
       }
 
-      if (buffer.cmp("show asm")) {
-         show_asm = true;
-         continue;
-      }
-
-      if (buffer.cmp("hide asm")) {
-         show_asm = false;
-         continue;
-      }
-
       auto lexer = lex(buffer, &allocator);
       Btree *tree = parse_expression(lexer);
 
       if (!tree) continue;
 
+      printf("\n--- START ---\n");
       gen_asm(tree);
+      printf("--- END ---\n\n");
    }
 
    allocator.free();
