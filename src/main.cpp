@@ -1,4 +1,4 @@
-#include "parser.cpp"
+#include "asm.cpp"
 
 int main() {
    auto allocator = fixed_allocator(getpagesize() * 2);
@@ -23,7 +23,7 @@ int main() {
 
       // @Temporary: Hardcoding the commands name and their functionality for now
 
-      if (buffer.cmp("quit") || buffer.cmp("exit")) {
+      if (buffer.cmp("quit")) {
          printf("Goodbye\n");
          break;
       }
@@ -44,7 +44,11 @@ int main() {
       }
 
       auto lexer = lex(buffer, &allocator);
-      if (!parse_expression(lexer)) continue;
+      Btree *tree = parse_expression(lexer);
+
+      if (!tree) continue;
+
+      gen_asm(tree);
    }
 
    allocator.free();

@@ -3,6 +3,7 @@
 struct Btree {
    Btree *left = NULL;
    Btree *right = NULL;
+   Btree *parent = NULL;
 
    int val = 0;
    char op;
@@ -20,7 +21,7 @@ void print_tree(Btree *node) {
    print_tree(node->right);
 }
 
-bool parse_expression(Lexer lexer) {
+Btree *parse_expression(Lexer lexer) {
    auto allocator = fixed_allocator(getpagesize()*2);
 
    Btree *last = NULL;
@@ -29,12 +30,12 @@ bool parse_expression(Lexer lexer) {
    for (auto token = lexer.next_token(); token; token = lexer.next_token()) {
       if (isalpha(token->literal)) { // @Temporary: Error case for now
          fprintf(stderr, "\n[Error]: Expression can not contain any alphabet characters\n");
-         return false;
+         return NULL;
       }
 
       if (!token->is_num && !is_operator(token->literal)) {
          fprintf(stderr, "Expression doesn't contain any numerical value\n");
-         return false;
+         return NULL;
       }
 
       if (is_operator(token->literal)) {
@@ -45,12 +46,16 @@ bool parse_expression(Lexer lexer) {
          auto next = lexer.next_token();
          if (!next->is_num) {
             fprintf(stderr, "\nExpected a number after the operator\n");
-            return false;
+            return NULL;
          }
 
          right->val = next->num;
          root->right = right;
+         right->parent = root;
+
          root->left = last;
+         last->parent = root;
+
          last = root;
       }
 
@@ -62,11 +67,11 @@ bool parse_expression(Lexer lexer) {
          left->val = token->num;
 
          auto *next = lexer.next_token();
-         if (!next) return false;
+         if (!next) return NULL;
 
          if (!is_operator(next->literal)) {
             fprintf(stderr, "\nExpected an operator after the number\n");
-            return false;
+            return NULL;
          }
 
          root->op = next->literal;
@@ -74,16 +79,20 @@ bool parse_expression(Lexer lexer) {
          next = lexer.next_token();
          if (!next->is_num) {
             fprintf(stderr, "\nExpected a number after the operator\n");
-            return false;
+            return NULL;
          }
 
          right->val = next->num;
 
          root->left = left;
          root->right = right;
+
+         left->parent = root;
+         right->parent = root;
+
          last = root;
       }
    }
 
-   return true;
+   return last;
 };
